@@ -1,0 +1,10 @@
+version: '3.4'
+
+services:
+  lraft:
+    image: lraft
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - 3000
