@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -21,21 +24,82 @@ type Store struct {
 	mu     sync.Mutex
 	mStore map[string]string // The key-value store for the system.
 
-	raft *raft.Raft // The consensus mechanism
+	raft        *raft.Raft // The consensus mechanism
+	BloomFilter bool
+	Count       int
 
 	logger *log.Logger
-}
-
-func (s *Store) Get(key string) (string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.mStore[key], nil
 }
 
 type Command struct {
 	Op    string `json:"op,omitempty"`
 	Key   string `json:"key,omitempty"`
 	Value string `json:"value,omitempty"`
+}
+
+func (s *Store) Open(enableSingle bool, nodeID string) error {
+	// Setup Raft configuration.
+	config := raft.DefaultConfig()
+	config.LocalID = raft.ServerID(nodeID)
+
+	// Setup Raft communication.
+	addr, err := net.ResolveTCPAddr("tcp", s.RaftBind)
+	if err != nil {
+		return err
+	}
+	transport, err := raft.NewTCPTransport(s.RaftBind, addr, 3, 10*time.Second, os.Stderr)
+	if err != nil {
+		return err
+	}
+
+	// Create the snapshot store. This allows the Raft to truncate the log.
+	snapshots, err := raft.NewFileSnapshotStore(s.RaftDir, 2, os.Stderr)
+	if err != nil {
+		return fmt.Errorf("file snapshot store: %s", err)
+	}
+	//Term
+	// Create the log store and stable store.
+	var logStore raft.LogStore
+	var stableStore raft.StableStore
+	if s.UseMem {
+		logStore = raft.NewInmemStore()
+		stableStore = raft.NewInmemStore()
+	} else {
+		//raftboltdb.NewBoltStore(filepath.Join(s.RaftDir, "raft.db"))
+		leveldb, err := NewLevelStore(filepath.Join(s.RaftDir, ""), s.BloomFilter, s.Count)
+		if err != nil {
+			return fmt.Errorf("new bolt store: %s", err)
+		}
+		logStore = leveldb
+		stableStore = leveldb
+	}
+
+	// Instantiate the Raft systems.
+	ra, err := raft.NewRaft(config, (*fsm)(s), logStore, stableStore, snapshots, transport)
+	if err != nil {
+		return fmt.Errorf("new raft: %s", err)
+	}
+	s.raft = ra
+
+	if enableSingle {
+		configuration := raft.Configuration{
+			Servers: []raft.Server{
+				{
+					ID:      config.LocalID,
+					Address: transport.LocalAddr(),
+				},
+			},
+		}
+		ra.BootstrapCluster(configuration)
+	}
+
+	return nil
+}
+
+func (s *Store) Get(key string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.mStore[key], nil
 }
 
 func (s *Store) Set(key, value string) error {

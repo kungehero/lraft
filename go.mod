@@ -8,6 +8,7 @@ require (
 	github.com/go-openapi/spec v0.19.7
 	github.com/goraft/raft v0.0.0-20150509002813-0061b6c82526 // indirect
 	github.com/hashicorp/raft v1.1.2
+	github.com/hashicorp/raft-boltdb v0.0.0-20171010151810-6e5ba93211ea
 	github.com/prometheus/alertmanager v0.20.0
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/ugorji/go/codec v1.1.7
