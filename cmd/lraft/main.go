@@ -20,7 +20,10 @@ const (
 	DefaultRaftAddr = ":12000"
 )
 
-var config Config
+var (
+	config     Config
+	ErrNotRaft = "No Raft storage directory specified\n"
+)
 
 type Config struct {
 	UseMem      bool
@@ -50,24 +53,17 @@ func main() {
 	flag.Parse()
 
 	if flag.NArg() == 0 {
-		fmt.Fprintf(os.Stderr, "No Raft storage directory specified\n")
+		fmt.Fprintf(os.Stderr, ErrNotRaft)
 		os.Exit(1)
 	}
 
 	// Ensure Raft storage exists.
 	raftDir := flag.Arg(0)
 	if raftDir == "" {
-		fmt.Fprintf(os.Stderr, "No Raft storage directory specified\n")
+		fmt.Fprintf(os.Stderr, ErrNotRaft)
 		os.Exit(1)
 	}
 	os.MkdirAll(raftDir, 0700)
-	/* db, err := leveldb.OpenFile("path/to/db", nil)
-	err = db.Put([]byte("key"), []byte("value"), nil)
-	data, err := db.Get([]byte("key"), nil)
-	fmt.Println(string(data))
-	if err != nil {
-		fmt.Println(err)
-	} */
 	s := &lraft.Store{}
 	s.RaftDir = raftDir
 	s.RaftBind = config.RaftAddr
@@ -90,7 +86,7 @@ func main() {
 	// Optionally, you can install the Swagger Service which provides a nice Web UI on your REST API
 	// You need to download the Swagger HTML5 assets and change the FilePath location in the config below.
 	// Open http://localhost:8080/apidocs/?url=http://localhost:8080/apidocs.json
-	http.Handle("/apidocs/", http.StripPrefix("/apidocs/", http.FileServer(http.Dir("/Users/emicklei/Projects/swagger-ui/dist"))))
+	http.Handle("/apidocs/", http.StripPrefix("/apidocs/", http.FileServer(http.Dir("/swagger-ui/dist"))))
 
 	log.Printf("start listening on localhost:8084")
 	log.Fatal(http.ListenAndServe(config.HttpAddr, nil))

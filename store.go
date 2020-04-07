@@ -2,6 +2,7 @@ package lraft
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -15,6 +16,10 @@ import (
 )
 
 const raftTimeOut = 10 * time.Second
+
+var (
+	ErrNotLear = errors.New("not leader")
+)
 
 type Store struct {
 	RaftDir  string
@@ -104,7 +109,7 @@ func (s *Store) Get(key string) (string, error) {
 
 func (s *Store) Set(key, value string) error {
 	if s.raft.State() != raft.Leader {
-		return fmt.Errorf("not leader")
+		return ErrNotLear
 	}
 	c := &Command{
 		Op:    "set",
@@ -122,7 +127,7 @@ func (s *Store) Set(key, value string) error {
 // Delete deletes the given key.
 func (s *Store) Delete(key string) error {
 	if s.raft.State() != raft.Leader {
-		return fmt.Errorf("not leader")
+		return ErrNotLear
 	}
 
 	c := &Command{
