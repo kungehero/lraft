@@ -1,10 +1,18 @@
 version: '3.4'
 
 services:
-  lraft:
-    image: lraft
-    build:
-      context: .
-      dockerfile: Dockerfile
+  lraft-node1:
+    image: kungehero/lraft:latest
+    command: 
+      - '-id=node1 -ha=localhost:8087 -ra=localhost:12000 raft'
     ports:
-      - 3000
+      - 8087:8087
+    volumes:
+      - raft/levaldb:raft/ldb
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+         - node.lables.lraft.base==true

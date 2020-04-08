@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	raftlevaldb "github.com/tidwall/raft-leveldb"
+	//raftlevaldb "github.com/tidwall/raft-leveldb"
 
 	"github.com/hashicorp/raft"
 )
@@ -73,10 +73,9 @@ func (s *Store) Open(enableSingle bool, nodeID string) error {
 		logStore = raft.NewInmemStore()
 		stableStore = raft.NewInmemStore()
 	} else {
-		//raftboltdb.NewBoltStore(filepath.Join(s.RaftDir, "raft.db"))
-		leveldb, err := raftlevaldb.NewLevelDBStore(filepath.Join(s.RaftDir, ""), 1) // NewLevelStore(filepath.Join(s.RaftDir, "ldb"), s.BloomFilter, s.Count)
+		leveldb, err := NewLevelStore(filepath.Join(s.RaftDir, "ldb"), s.BloomFilter, s.Count)
 		if err != nil {
-			return fmt.Errorf("new bolt store: %s", err)
+			return fmt.Errorf("new leaveldb store: %s", err)
 		}
 		logStore = leveldb
 		stableStore = leveldb
@@ -105,18 +104,15 @@ func (s *Store) Open(enableSingle bool, nodeID string) error {
 }
 
 func (s *Store) Get(key string) (string, error) {
-	fmt.Println("s.Raft.State()")
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.mStore[key], nil
 }
 
 func (s *Store) Set(key, value string) error {
-	/* if s.Raft.State() != raft.Leader {
+	if s.Raft.State() != raft.Leader {
 		return ErrNotLear
-	}*/
-	fmt.Println("===============================================-------------------------------------0000000000000=lllls.Raft.State()")
-	fmt.Println(s.Raft.State())
+	}
 	c := &Command{
 		Op:    "set",
 		Key:   key,

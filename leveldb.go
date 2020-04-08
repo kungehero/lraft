@@ -24,7 +24,7 @@ var (
 type LevelDBStore struct {
 	mu    sync.Mutex
 	conn  *leveldb.DB
-	batch *leveldb.Batch
+	batch leveldb.Batch
 	path  string
 	bloom bool
 	count int
@@ -122,10 +122,10 @@ func (db *LevelDBStore) StoreLogs(logs []*raft.Log) error {
 
 func (db *LevelDBStore) bathFlush() error {
 	opt := opt.WriteOptions{Sync: true}
-	defer db.batch.Reset()
-	if err := db.conn.Write(db.batch, &opt); err != nil {
+	if err := db.conn.Write(&db.batch, &opt); err != nil {
 		return err
 	}
+	db.batch.Reset()
 	return nil
 }
 
@@ -173,9 +173,11 @@ func (db *LevelDBStore) Get(key []byte) ([]byte, error) {
 	}
 	return val, nil
 }
+
 func (db *LevelDBStore) SetUint64(key []byte, val uint64) error {
 	return db.Set(key, uint64ToBytes(val))
 }
+
 func (db *LevelDBStore) GetUint64(key []byte) (uint64, error) {
 	val, err := db.Get(key)
 	if err != nil {

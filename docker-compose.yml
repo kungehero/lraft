@@ -2,7 +2,18 @@ version: '3.4'
 
 services:
   lraft:
-    image: lraft
-    build: .
+    image: kungehero/lraft:0.0.1
+    build: 
+      dockerfile: Dockerfile
+      context: .
     ports:
-      - 3000
+      - 8087:8087
+    command: 
+      #- '-usemem=flase'
+      - '-id=node1'
+      - '-ha=localhost:8087'
+      - '-ra=localhost:12000 raft'
+      #- '-join=ip:port'
+      #- '-bloomfilter=false'
+      #- '-count=3'
+      - 'raft'
