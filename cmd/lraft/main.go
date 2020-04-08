@@ -91,7 +91,7 @@ func main() {
 	// You need to download the Swagger HTML5 assets and change the FilePath location in the config below.
 	// Open http://localhost:8080/apidocs/?url=http://localhost:8080/apidocs.json
 	http.Handle("/apidocs/", http.StripPrefix("/apidocs/", http.FileServer(http.Dir("/swagger-ui/dist"))))
-	log.Printf("start listening on localhost:8087")
+	log.Printf("start listening on:" + config.HttpAddr)
 	fmt.Println("start successfuly!")
 
 	if err := http.ListenAndServe(config.HttpAddr, nil); err != nil {
