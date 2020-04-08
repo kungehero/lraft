@@ -1,0 +1,157 @@
+{
+    "swagger": "2.0",
+    "info": {
+     "description": "Resource for managing Users",
+     "title": "UserService",
+     "contact": {
+      "name": "john",
+      "url": "http://johndoe.org",
+      "email": "john@doe.rp"
+     },
+     "license": {
+      "name": "MIT",
+      "url": "http://mit.org"
+     },
+     "version": "1.0.0"
+    },
+    "paths": {
+     "/lraft/put": {
+      "post": {
+       "consumes": [
+        "application/json"
+       ],
+       "produces": [
+        "application/json"
+       ],
+       "tags": [
+        "levalDB Raft"
+       ],
+       "summary": "添加 k-v",
+       "operationId": "put",
+       "parameters": [
+        {
+         "name": "body",
+         "in": "body",
+         "required": true,
+         "schema": {
+          "$ref": "#/definitions/lraft.KV"
+         }
+        }
+       ],
+       "responses": {
+        "200": {
+         "description": "OK",
+         "schema": {
+          "$ref": "#/definitions/lraft.Msg"
+         }
+        }
+       }
+      }
+     },
+     "/lraft/{key}": {
+      "get": {
+       "consumes": [
+        "application/json"
+       ],
+       "produces": [
+        "application/json"
+       ],
+       "tags": [
+        "levalDB Raft"
+       ],
+       "summary": "根据key获取信息",
+       "operationId": "get",
+       "responses": {
+        "200": {
+         "description": "OK",
+         "schema": {
+          "$ref": "#/definitions/lraft.Msg"
+         }
+        },
+        "400": {
+         "description": "bad request"
+        },
+        "500": {
+         "description": "server error"
+        }
+       }
+      },
+      "delete": {
+       "consumes": [
+        "application/json"
+       ],
+       "produces": [
+        "application/json"
+       ],
+       "tags": [
+        "levalDB Raft"
+       ],
+       "summary": "删除key",
+       "operationId": "delete",
+       "responses": {
+        "200": {
+         "description": "OK",
+         "schema": {
+          "$ref": "#/definitions/mongo.DeleteResult"
+         }
+        },
+        "500": {
+         "description": "server error"
+        }
+       }
+      }
+     }
+    },
+    "definitions": {
+     "lraft.KV": {
+      "required": [
+       "key",
+       "value"
+      ],
+      "properties": {
+       "key": {
+        "type": "string"
+       },
+       "value": {
+        "type": "string"
+       }
+      }
+     },
+     "lraft.Msg": {
+      "required": [
+       "code",
+       "data",
+       "Message"
+      ],
+      "properties": {
+       "Message": {
+        "type": "string"
+       },
+       "code": {
+        "type": "integer",
+        "format": "int32"
+       },
+       "data": {
+        "type": "string"
+       }
+      }
+     },
+     "mongo.DeleteResult": {
+      "required": [
+       "DeletedCount"
+      ],
+      "properties": {
+       "DeletedCount": {
+        "type": "integer",
+        "format": "int64"
+       }
+      }
+     }
+    },
+    "tags": [
+     {
+      "description": "Managing users",
+      "name": "users"
+     }
+    ]
+   }

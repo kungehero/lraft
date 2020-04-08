@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	raftlevaldb "github.com/tidwall/raft-leveldb"
+
 	"github.com/hashicorp/raft"
 )
 
@@ -29,7 +31,7 @@ type Store struct {
 	mu     sync.Mutex
 	mStore map[string]string // The key-value store for the system.
 
-	raft        *raft.Raft // The consensus mechanism
+	Raft        *raft.Raft // The consensus mechanism
 	BloomFilter bool
 	Count       int
 
@@ -43,6 +45,7 @@ type Command struct {
 }
 
 func (s *Store) Open(enableSingle bool, nodeID string) error {
+	s.mStore = make(map[string]string)
 	// Setup Raft configuration.
 	config := raft.DefaultConfig()
 	config.LocalID = raft.ServerID(nodeID)
@@ -71,12 +74,13 @@ func (s *Store) Open(enableSingle bool, nodeID string) error {
 		stableStore = raft.NewInmemStore()
 	} else {
 		//raftboltdb.NewBoltStore(filepath.Join(s.RaftDir, "raft.db"))
-		leveldb, err := NewLevelStore(filepath.Join(s.RaftDir, ""), s.BloomFilter, s.Count)
+		leveldb, err := raftlevaldb.NewLevelDBStore(filepath.Join(s.RaftDir, ""), 1) // NewLevelStore(filepath.Join(s.RaftDir, "ldb"), s.BloomFilter, s.Count)
 		if err != nil {
 			return fmt.Errorf("new bolt store: %s", err)
 		}
 		logStore = leveldb
 		stableStore = leveldb
+
 	}
 
 	// Instantiate the Raft systems.
@@ -84,8 +88,7 @@ func (s *Store) Open(enableSingle bool, nodeID string) error {
 	if err != nil {
 		return fmt.Errorf("new raft: %s", err)
 	}
-	s.raft = ra
-
+	s.Raft = ra
 	if enableSingle {
 		configuration := raft.Configuration{
 			Servers: []raft.Server{
@@ -102,31 +105,35 @@ func (s *Store) Open(enableSingle bool, nodeID string) error {
 }
 
 func (s *Store) Get(key string) (string, error) {
+	fmt.Println("s.Raft.State()")
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.mStore[key], nil
 }
 
 func (s *Store) Set(key, value string) error {
-	if s.raft.State() != raft.Leader {
+	/* if s.Raft.State() != raft.Leader {
 		return ErrNotLear
-	}
+	}*/
+	fmt.Println("===============================================-------------------------------------0000000000000=lllls.Raft.State()")
+	fmt.Println(s.Raft.State())
 	c := &Command{
 		Op:    "set",
 		Key:   key,
 		Value: value,
 	}
 	b, err := json.Marshal(c)
+
 	if err != nil {
 		return err
 	}
-	f := s.raft.Apply(b, raftTimeOut)
+	f := s.Raft.Apply(b, raftTimeOut)
 	return f.Error()
 }
 
 // Delete deletes the given key.
 func (s *Store) Delete(key string) error {
-	if s.raft.State() != raft.Leader {
+	if s.Raft.State() != raft.Leader {
 		return ErrNotLear
 	}
 
@@ -139,13 +146,13 @@ func (s *Store) Delete(key string) error {
 		return err
 	}
 
-	f := s.raft.Apply(b, raftTimeOut)
+	f := s.Raft.Apply(b, raftTimeOut)
 	return f.Error()
 }
 
 func (s *Store) Join(nodeID, addr string) error {
 	s.logger.Printf("received join request for remote node %s at %s", nodeID, addr)
-	configfuture := s.raft.GetConfiguration()
+	configfuture := s.Raft.GetConfiguration()
 	if err := configfuture.Error(); err != nil {
 		s.logger.Printf("failed to get raft configuration: %v", err)
 		return err
@@ -156,13 +163,13 @@ func (s *Store) Join(nodeID, addr string) error {
 				s.logger.Printf("node %s at %s already member of cluster, ignoring join request", nodeID, addr)
 				return nil
 			}
-			future := s.raft.RemoveServer(server.ID, 0, 0)
+			future := s.Raft.RemoveServer(server.ID, 0, 0)
 			if err := future.Error(); err != nil {
 				return fmt.Errorf("error removing existing node %s at %s: %s", nodeID, addr, err)
 			}
 		}
 	}
-	f := s.raft.AddVoter(raft.ServerID(nodeID), raft.ServerAddress(addr), 1, raftTimeOut)
+	f := s.Raft.AddVoter(raft.ServerID(nodeID), raft.ServerAddress(addr), 1, raftTimeOut)
 	if err := f.Error(); err != nil {
 		return err
 	}
@@ -187,7 +194,6 @@ func (f *fsm) Apply(l *raft.Log) interface{} {
 	default:
 		panic(fmt.Sprintf("unrecognized command op: %s", c.Op))
 	}
-	return nil
 }
 
 // Snapshot returns a snapshot of the key-value store.
@@ -209,9 +215,6 @@ func (f *fsm) Restore(rc io.ReadCloser) error {
 	if err := json.NewDecoder(rc).Decode(&o); err != nil {
 		return err
 	}
-
-	// Set the state from the snapshot, no lock required according to
-	// Hashicorp docs.
 	f.mStore = o
 	return nil
 }

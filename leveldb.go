@@ -167,7 +167,7 @@ func (db *LevelDBStore) Get(key []byte) ([]byte, error) {
 	val, err := db.conn.Get(append(dbConf, key...), nil)
 	if err != nil {
 		if err == leveldb.ErrNotFound {
-			return nil, errors.New("key not found")
+			return nil, ErrKeyNotFound
 		}
 		return nil, err
 	}

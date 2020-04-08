@@ -16,8 +16,8 @@ import (
 
 // Command line defaults
 const (
-	DefaultHTTPAddr = ":8088"
-	DefaultRaftAddr = ":12000"
+	DefaultHTTPAddr = ":8087"
+	DefaultRaftAddr = ":12001"
 )
 
 var (
@@ -73,8 +73,7 @@ func main() {
 	if err := s.Open(config.JoinAddr == "", config.NodeID); err != nil {
 		log.Fatalf("failed to start HTTP service: %s", err.Error())
 	}
-
-	u := lraft.LevaldbResource{}
+	u := &lraft.LeveldbResource{Store: s}
 	restful.DefaultContainer.Add(u.WebService())
 
 	rfconfig := restfulspec.Config{
@@ -87,10 +86,13 @@ func main() {
 	// You need to download the Swagger HTML5 assets and change the FilePath location in the config below.
 	// Open http://localhost:8080/apidocs/?url=http://localhost:8080/apidocs.json
 	http.Handle("/apidocs/", http.StripPrefix("/apidocs/", http.FileServer(http.Dir("/swagger-ui/dist"))))
+	log.Printf("start listening on localhost:8088")
+	fmt.Println("start successfuly!")
 
-	log.Printf("start listening on localhost:8084")
-	log.Fatal(http.ListenAndServe(config.HttpAddr, nil))
-
+	if err := http.ListenAndServe(config.HttpAddr, nil); err != nil {
+		fmt.Println(err)
+		return
+	}
 	if config.JoinAddr != "" {
 		if err := s.Join(config.NodeID, config.JoinAddr); err != nil {
 			log.Fatalf("failed to join node at %s: %s", config.JoinAddr, err.Error())
@@ -101,4 +103,5 @@ func main() {
 	signal.Notify(terminate, os.Interrupt)
 	<-terminate
 	log.Println("hraftd exiting")
+
 }

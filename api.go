@@ -6,13 +6,26 @@ import (
 
 	"github.com/emicklei/go-restful"
 	restfulspec "github.com/emicklei/go-restful-openapi"
-	"github.com/prometheus/alertmanager/template"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-type LevaldbResource struct {
+type StoreAdd interface {
+	// Get returns the value for the given key.
+	Get(key string) (string, error)
+
+	// Set sets the value for the given key, via distributed consensus.
+	Set(key, value string) error
+
+	// Delete removes the given key, via distributed consensus.
+	Delete(key string) error
+
+	// Join joins the node, identitifed by nodeID and reachable at addr, to the cluster.
+	Join(nodeID string, addr string) error
+}
+
+type LeveldbResource struct {
 	// normally one would use DAO (data access object)
-	store *Store
+	Store StoreAdd
 }
 
 type Msg struct {
@@ -27,7 +40,7 @@ type KV struct {
 }
 
 // WebService creates a new service that can handle REST requests for User resources.
-func (lr LevaldbResource) WebService() *restful.WebService {
+func (lr *LeveldbResource) WebService() *restful.WebService {
 	ws := new(restful.WebService)
 	ws.
 		Path("/lraft").
@@ -48,9 +61,8 @@ func (lr LevaldbResource) WebService() *restful.WebService {
 		Doc("添加 k-v").
 		Writes(KV{}).
 		Returns(http.StatusOK, "OK", Msg{}).
-		//Param(ws.PathParameter("user-id", "identifier of the user").DataType("string")).
 		Metadata(restfulspec.KeyOpenAPITags, tags).
-		Reads(template.Data{})) // from the request
+		Reads(KV{}))
 
 	ws.Route(ws.DELETE("/{key}").To(lr.delete).
 		Doc("删除key").
@@ -61,36 +73,35 @@ func (lr LevaldbResource) WebService() *restful.WebService {
 	return ws
 }
 
-func (lr *LevaldbResource) get(request *restful.Request, response *restful.Response) {
+func (lr *LeveldbResource) get(request *restful.Request, response *restful.Response) {
 	key := request.PathParameter("key")
-	v, err := lr.store.Get(key)
-	if err == nil {
-		response.WriteEntity(&Msg{Data: v, Code: http.StatusOK, Message: http.StatusText(http.StatusOK)})
-	} else {
-		response.WriteError(http.StatusInternalServerError, err)
+	v, err := lr.Store.Get(key)
+	if err != nil {
+		response.WriteError(http.StatusInternalServerError, nil)
+		return
 	}
+	response.WriteEntity(&Msg{Data: v, Code: http.StatusOK, Message: http.StatusText(http.StatusOK)})
 }
 
-func (lr *LevaldbResource) put(request *restful.Request, response *restful.Response) {
+func (lr *LeveldbResource) put(request *restful.Request, response *restful.Response) {
 	var kv KV
 	if err := request.ReadEntity(&kv); err != nil {
 		response.WriteError(http.StatusInternalServerError, err)
 	}
-
-	err := lr.store.Set(kv.Key, kv.Value)
-	if err == nil {
-		response.WriteEntity(&Msg{Code: http.StatusOK, Data: fmt.Sprintf("%v-%v", kv.Key, kv.Value), Message: http.StatusText(http.StatusOK)})
-	} else {
+	err := lr.Store.Set(kv.Key, kv.Value)
+	if err != nil {
 		response.WriteError(http.StatusInternalServerError, err)
+		return
 	}
+	response.WriteEntity(&Msg{Code: http.StatusOK, Data: fmt.Sprintf("%v-%v", kv.Key, kv.Value), Message: http.StatusText(http.StatusOK)})
 }
 
-func (lr *LevaldbResource) delete(request *restful.Request, response *restful.Response) {
+func (lr *LeveldbResource) delete(request *restful.Request, response *restful.Response) {
 	key := request.PathParameter("key")
-	err := lr.store.Delete(key)
-	if err == nil {
-		response.WriteEntity(&Msg{Code: http.StatusOK, Message: http.StatusText(http.StatusOK)})
-	} else {
+	err := lr.Store.Delete(key)
+	if err != nil {
 		response.WriteError(http.StatusInternalServerError, err)
+		return
 	}
+	response.WriteEntity(&Msg{Code: http.StatusOK, Message: http.StatusText(http.StatusOK)})
 }
