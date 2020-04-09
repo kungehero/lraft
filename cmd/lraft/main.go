@@ -55,58 +55,69 @@ func init() {
 }
 
 func main() {
-	//	flag.Parse()
-
-	/* if flag.NArg() == 0 {
-		fmt.Fprintf(os.Stderr, ErrNotRaft)
-		os.Exit(1)
+	//config
+	{
+		if config.RaftDir == "" {
+			fmt.Fprintf(os.Stderr, ErrNotRaft)
+			os.Exit(1)
+		}
+		os.MkdirAll(config.RaftDir, 0700)
+		s := &lraft.Store{}
+		s.RaftDir = config.RaftDir
+		s.RaftBind = config.RaftAddr
+		s.UseMem = config.UseMem
+		s.BloomFilter = config.BloomFilter
+		s.Count = config.Count
+	}
+	
+	//raft open
+	{
+		if err := s.Open(config.JoinAddr == "", config.NodeID); err != nil {
+			log.Fatalf("failed to start HTTP service: %s", err.Error())
+		}
+	}
+	
+	//go-restful webservice
+	{
+		u := &lraft.LeveldbResource{Store: s}
+		restful.DefaultContainer.Add(u.WebService())
+	}
+	
+	//swagger ui
+	{
+		rfconfig := restfulspec.Config{
+			WebServices:                   restful.RegisteredWebServices(),
+			APIPath:                       "/apidocs.json",
+			PostBuildSwaggerObjectHandler: enrichSwaggerObject}
+		restful.DefaultContainer.Add(restfulspec.NewOpenAPIService(rfconfig))
+		// Open http://localhost:8080/apidocs/?url=http://localhost:8080/apidocs.json
+		http.Handle("/apidocs/", http.StripPrefix("/apidocs/", http.FileServer(http.Dir("/swagger-ui/dist"))))
 	}
 
-	// Ensure Raft storage exists.
-	raftDir := flag.Arg(0) */
-	if config.RaftDir == "" {
-		fmt.Fprintf(os.Stderr, ErrNotRaft)
-		os.Exit(1)
-	}
-	os.MkdirAll(config.RaftDir, 0700)
-	s := &lraft.Store{}
-	s.RaftDir = config.RaftDir
-	s.RaftBind = config.RaftAddr
-	s.UseMem = config.UseMem
-	s.BloomFilter = config.BloomFilter
-	s.Count = config.Count
-	if err := s.Open(config.JoinAddr == "", config.NodeID); err != nil {
-		log.Fatalf("failed to start HTTP service: %s", err.Error())
-	}
-	u := &lraft.LeveldbResource{Store: s}
-	restful.DefaultContainer.Add(u.WebService())
-
-	rfconfig := restfulspec.Config{
-		WebServices:                   restful.RegisteredWebServices(),
-		APIPath:                       "/apidocs.json",
-		PostBuildSwaggerObjectHandler: enrichSwaggerObject}
-	restful.DefaultContainer.Add(restfulspec.NewOpenAPIService(rfconfig))
-
-	// Optionally, you can install the Swagger Service which provides a nice Web UI on your REST API
-	// You need to download the Swagger HTML5 assets and change the FilePath location in the config below.
-	// Open http://localhost:8080/apidocs/?url=http://localhost:8080/apidocs.json
-	http.Handle("/apidocs/", http.StripPrefix("/apidocs/", http.FileServer(http.Dir("/swagger-ui/dist"))))
-	log.Printf("start listening on:" + config.HttpAddr)
-	fmt.Println("start successfuly!")
-
-	if err := http.ListenAndServe(config.HttpAddr, nil); err != nil {
-		fmt.Println(err)
-		return
-	}
-	if config.JoinAddr != "" {
-		if err := s.Join(config.NodeID, config.JoinAddr); err != nil {
-			log.Fatalf("failed to join node at %s: %s", config.JoinAddr, err.Error())
+	//raft join
+	{
+		if config.JoinAddr != "" {
+			if err := s.Join(config.NodeID, config.JoinAddr); err != nil {
+				log.Fatalf("failed to join node at %s: %s", config.JoinAddr, err.Error())
+			}
 		}
 	}
 
-	terminate := make(chan os.Signal, 1)
-	signal.Notify(terminate, os.Interrupt)
-	<-terminate
-	log.Println("hraftd exiting")
-
+	//http start
+	{
+		log.Printf("start listening on:" + config.HttpAddr)
+		fmt.Println("start successfuly!")
+		if err := http.ListenAndServe(config.HttpAddr, nil); err != nil {
+			fmt.Println(err)
+			return
+		}
+	}
+	
+	//singal exit
+	{
+		terminate := make(chan os.Signal, 1)
+		signal.Notify(terminate, os.Interrupt)
+		<-terminate
+		log.Println("hraftd exiting")
+	}
 }
