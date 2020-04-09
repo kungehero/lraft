@@ -6,13 +6,13 @@ import "github.com/go-openapi/spec"
 func enrichSwaggerObject(swo *spec.Swagger) {
 	swo.Info = &spec.Info{
 		InfoProps: spec.InfoProps{
-			Title:       "UserService",
-			Description: "Resource for managing Users",
+			Title:       "LevelDB Raft",
+			Description: "Raft backend using LevelDB of Lraft",
 			Contact: &spec.ContactInfo{
 				ContactInfoProps: spec.ContactInfoProps{
-					Name:  "john",
-					Email: "john@doe.rp",
-					URL:   "http://johndoe.org",
+					Name:  "zk",
+					Email: "zk@doe.rp",
+					URL:   "http://zk.org",
 				},
 			},
 			License: &spec.License{
@@ -25,6 +25,6 @@ func enrichSwaggerObject(swo *spec.Swagger) {
 		},
 	}
 	swo.Tags = []spec.Tag{spec.Tag{TagProps: spec.TagProps{
-		Name:        "users",
-		Description: "Managing users"}}}
+		Name:        "lraft",
+		Description: "Managing lraft"}}}
 }

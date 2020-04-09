@@ -56,7 +56,6 @@ func init() {
 
 func main() {
 	//config
-	{
 		if config.RaftDir == "" {
 			fmt.Fprintf(os.Stderr, ErrNotRaft)
 			os.Exit(1)
@@ -68,7 +67,6 @@ func main() {
 		s.UseMem = config.UseMem
 		s.BloomFilter = config.BloomFilter
 		s.Count = config.Count
-	}
 	
 	//raft open
 	{
