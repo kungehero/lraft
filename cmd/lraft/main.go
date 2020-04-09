@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/emicklei/go-restful"
 	restfulspec "github.com/emicklei/go-restful-openapi"
+	"github.com/oklog/run"
 )
 
 // Command line defaults
@@ -94,19 +96,44 @@ func main() {
 	log.Printf("start listening on:" + config.HttpAddr)
 	fmt.Println("start successfuly!")
 
-	if err := http.ListenAndServe(config.HttpAddr, nil); err != nil {
-		fmt.Println(err)
-		return
+	var g run.Group
+	// start http server.
+	{
+		server := &http.Server{Addr: config.HttpAddr, Handler: http.DefaultServeMux}
+		g.Add(func() error {
+			return server.ListenAndServe()
+		}, func(err error) {
+			if err == http.ErrServerClosed {
+				log.Println("internal server closed unexpectedly")
+				return
+			}
+			if err := server.Shutdown(context.TODO()); err != nil {
+				log.Println("shutdown server", err)
+			}
+		})
 	}
+
 	if config.JoinAddr != "" {
 		if err := s.Join(config.NodeID, config.JoinAddr); err != nil {
 			log.Fatalf("failed to join node at %s: %s", config.JoinAddr, err.Error())
 		}
 	}
 
-	terminate := make(chan os.Signal, 1)
-	signal.Notify(terminate, os.Interrupt)
-	<-terminate
-	log.Println("hraftd exiting")
+	// termination by signal Interrupt
+	{
+		terminate := make(chan os.Signal, 1)
+		g.Add(func() error {
+			signal.Notify(terminate, os.Interrupt)
+			<-terminate
+			return nil
+		}, func(error) {
+			close(terminate)
+		})
+	}
 
+	if err := g.Run(); err != nil {
+		log.Println("err", err)
+	}
+
+	log.Println("lraftd exiting")
 }
